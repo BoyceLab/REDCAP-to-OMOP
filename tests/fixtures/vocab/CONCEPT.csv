@@ -1,0 +1,28 @@
+concept_id	concept_name	domain_id	vocabulary_id	concept_class_id	standard_concept	concept_code	valid_start_date	valid_end_date	invalid_reason
+8532	FEMALE	Gender	Gender	Gender	S	F	19700101	20991231	
+8507	MALE	Gender	Gender	Gender	S	M	19700101	20991231	
+766349	Depression, unspecified	Condition	ICD10CM	4-char billing code		F32.A	20211001	20991231	
+3036277	Body height	Measurement	LOINC	Clinical Observation	S	8302-2	19960906	20991231	
+3025315	Body weight	Measurement	LOINC	Clinical Observation	S	29463-7	19700101	20991231	
+43054909	Tobacco smoking status	Observation	LOINC	Clinical Observation	S	72166-2	20121228	20991231	
+1546440	Fijian	Race	Race	Race	S	OMOP5558582	20250701	20991231	
+711584	levetiracetam	Drug	RxNorm	Ingredient	S	114477	19700101	20991231	
+705103	lamotrigine	Drug	RxNorm	Ingredient	S	28439	19700101	20991231	
+742267	topiramate	Drug	RxNorm	Ingredient	S	38404	19700101	20991231	
+745466	valproate	Drug	RxNorm	Ingredient	S	40254	19700101	20991231	
+4152194	Systolic blood pressure	Measurement	SNOMED	Observable Entity	S	271649006	20020131	20991231	
+440383	Depressive disorder	Condition	SNOMED	Disorder	S	35489007	20020131	20991231	
+4188539	Yes	Meas Value	SNOMED	Qualifier Value	S	373066001	20020731	20991231	
+4188540	No	Meas Value	SNOMED	Qualifier Value	S	373067005	20020731	20991231	
+4181917	Electroencephalogram	Procedure	SNOMED	Procedure	S	54550000	20020131	20991231	
+201820	Diabetes mellitus	Condition	SNOMED	Disorder	S	73211009	20020131	20991231	
+37311324	MRI of brain	Procedure	SNOMED	Procedure	S	816077007	20200131	20991231	
+442077	Anxiety disorder	Condition	SNOMED	Disorder	S	197480006	20020131	20991231	
+374919	Multiple sclerosis	Condition	SNOMED	Disorder	S	24700007	20020131	20991231	
+318736	Migraine	Condition	SNOMED	Disorder	S	37796009	20020131	20991231	
+316866	Hypertensive disorder	Condition	SNOMED	Disorder	S	38341003	20020131	20991231	
+380378	Epilepsy	Condition	SNOMED	Disorder	S	84757009	20020131	20991231	
+32879	Registry	Type Concept	Type Concept	Type Concept	S	OMOP4976952	20200820	20991231	
+8582	centimeter	Unit	UCUM	Unit	S	cm	19700101	20991231	
+9529	kilogram	Unit	UCUM	Unit	S	kg	19700101	20991231	
+9202	Outpatient Visit	Visit	Visit	Visit	S	OP	19700101	20991231	

@@ -1,0 +1,18 @@
+# Keep real data out of the repository. Work in local/, or anywhere outside it.
+local/
+omop_output/
+*.xlsx
+
+# Outputs of the tools when run in the repository root
+check_report.csv
+qc_report.md
+
+# Athena vocabulary files (each user downloads their own)
+CONCEPT*.csv
+!tests/fixtures/vocab/CONCEPT.csv
+!tests/fixtures/vocab/CONCEPT_RELATIONSHIP.csv
+DRUG_STRENGTH.csv
+VOCABULARY.csv
+
+__pycache__/
+.venv/

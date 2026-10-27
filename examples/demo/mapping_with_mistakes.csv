@@ -1,0 +1,46 @@
+form,field,field_type,validation,field_label,choice_code,choice_label,omop_table,concept_id,concept_name,value_concept_id,value_concept_name,unit_concept_id,unit_concept_name,date_field,date_offset_days,notes
+enrollment,record_id,text,,Record ID,,,SKIP,,,,,,,,,record id
+enrollment,dob,text,date_ymd,Date of birth,,,SKIP,,,,,,,,,person: birth date
+enrollment,sex,radio,,Sex,1,Male,SKIP,,,,,,,,,person: sex
+enrollment,sex,radio,,Sex,2,Female,SKIP,,,,,,,,,person: sex
+enrollment,sex,radio,,Sex,3,Other,SKIP,,,,,,,,,person: sex
+enrollment,enroll_date,text,date_ymd,Enrollment date,,,SKIP,,,,,,,,,form date (enrollment)
+enrollment,primary_dx,radio,,Primary diagnosis,1,Epilepsy,CONDITION_OCCURRENCE,380378,Epilepsy,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,2,Migraine,CONDITION_OCCURRENCE,99999999,Migraine,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,3,Multiple sclerosis,CONDITION_OCCURRENCE,374919,Multiple sclerosis,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,4,Other,CONDITION_OCCURRENCE,0,,,,,,dx_date,,no single standard concept for 'Other'
+enrollment,dx_date,text,date_ymd,Date of diagnosis,,,SKIP,,,,,,,,,date for primary_dx
+baseline,base_date,text,date_ymd,Baseline visit date,,,SKIP,,,,,,,,,form date (baseline)
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),1,Hypertension,CONDITION_OCCURRENCE,4152194,Hypertension,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),2,Diabetes,CONDITION_OCCURRENCE,201820,Diabetes mellitus,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),3,Depression,CONDITION_OCCURRENCE,766349,Depression,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),4,Anxiety,CONDITION_OCCURRENCE,442077,Anxiety disorder,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),99,Other,CONDITION_OCCURRENCE,442077,Anxiety disorder,,,,,,,
+baseline,meds,checkbox,,Current medications,1,Levetiracetam,DRUG_EXPOSURE,1546440,levetiracetam,,,,,,,
+baseline,meds,checkbox,,Current medications,2,Lamotrigine,DRUG_EXPOSURE,705103,lamotrigine,,,,,,,
+baseline,meds,checkbox,,Current medications,3,Valproate,DRUG_EXPOSURE,745466,valproate,,,,,,,
+baseline,meds,checkbox,,Current medications,4,Topiramate,DRUG_EXPOSURE,742267,topiramate,,,,,,,
+baseline,meds,checkbox,,Current medications,99,Other,DRUG_EXPOSURE,0,,,,,,,,'Other' is free text in meds_other
+baseline,meds_other,text,,"Other medication, specify",,,SKIP,,,,,,,,,free text; no concept without review
+baseline,weight,text,number,Weight (kg),,,OBSERVATION,3025315,Body weight,,,9529,kilogram,,,
+baseline,height,text,number,Height (cm),,,MEASUREMENT,3036277,Body height,,,8582,centimeter,,,
+baseline,smoker,yesno,,Current smoker?,1,Yes,OBSERVATION,43054909,Tobacco smoking status,4188539,Yes,,,,,
+baseline,smoker,yesno,,Current smoker?,0,No,OBSERVATION,43054909,Tobacco smoking status,4188540,No,,,,,
+baseline,eeg_done,yesno,,EEG performed?,1,Yes,PROCEDURE_OCCURRENCE,4181917,Electroencephalogram,,,,,,,
+baseline,eeg_done,yesno,,EEG performed?,0,No,SKIP,,,,,,,,,not done: nothing to record
+baseline,mri_done,yesno,,Brain MRI performed?,1,Yes,PROCEDURE_OCCURRENCE,37311324,MRI of brain,,,,,,,
+baseline,mri_done,yesno,,Brain MRI performed?,0,No,SKIP,,,,,,,,,not done: nothing to record
+baseline,sz_per_month,text,integer,Seizures per month,,,OBSERVATION,0,,,,,,,,no standard concept chosen yet for seizure frequency
+follow_up,fu_date,text,date_ymd,Follow-up date,,,SKIP,,,,,,,,,form date (follow_up)
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,1,Levetiracetam,DRUG_EXPOSURE,711584,levetiracetam,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,2,Lamotrigine,DRUG_EXPOSURE,705103,lamotrigine,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,3,Valproate,DRUG_EXPOSURE,745466,valproate,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,4,Topiramate,DRUG_EXPOSURE,742267,topiramate,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,99,Other,DRUG_EXPOSURE,0,,,,,,,,'Other' is free text in meds_other
+follow_up,fu_weight,text,number,Weight (kg),,,MEASUREMENT,3025315,Body weight,,,9529,kilogram,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,1,Yes,,,,,,,,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,0,No,SKIP,,,,,,,,,no hospital stay: nothing to record
+end_of_study,deceased,yesno,,Has the participant died?,1,Yes,SKIP,,,,,,,,,death: flag
+end_of_study,deceased,yesno,,Has the participant died?,0,No,SKIP,,,,,,,,,death: flag
+end_of_study,death_date,text,date_ymd,Date of death,,,SKIP,,,,,,,,,death: date
+end_of_study,study_notes,notes,,Notes,,,SKIP,,,,,,,,,free text

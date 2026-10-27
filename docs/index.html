@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REDCap to OMOP mapping wizard</title>
+<style>
+:root {
+  --ink: #1d2330; --muted: #5b6475; --line: #d9dde5; --soft: #f4f6f9; --paper: #ffffff;
+  --accent: #2f5d8a; --accent-ink: #ffffff; --ok: #1f7a4d; --ok-soft: #e3f3ea;
+  --warn: #8a5a00; --warn-soft: #fff3d6; --bad: #a8262b; --bad-soft: #fbe5e6;
+  --undecided: #44526b; --undecided-soft: #e8ecf3; --skip: #6b7280; --skip-soft: #eef0f2;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+       color: var(--ink); background: var(--soft); }
+header { background: var(--paper); border-bottom: 1px solid var(--line); padding: 14px 24px; }
+header h1 { margin: 0; font-size: 20px; }
+header p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+nav.steps { display: flex; gap: 4px; padding: 0 24px; background: var(--paper);
+            border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+nav.steps button { border: 0; background: none; padding: 10px 14px; font: inherit; color: var(--muted);
+                   border-bottom: 3px solid transparent; cursor: pointer; }
+nav.steps button[aria-current="step"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+nav.steps button .n { display: inline-block; width: 20px; height: 20px; border-radius: 50%;
+                      background: var(--undecided-soft); color: var(--undecided); text-align: center;
+                      font-size: 12px; line-height: 20px; margin-right: 6px; }
+nav.steps button[aria-current="step"] .n { background: var(--accent); color: var(--accent-ink); }
+main { padding: 20px 24px 60px; max-width: 1500px; }
+section.step { display: none; }
+section.step.on { display: block; }
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px;
+        margin-bottom: 16px; }
+.card h2 { margin: 0 0 6px; font-size: 17px; }
+.card h3 { margin: 14px 0 6px; font-size: 15px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+button.btn, label.btn { display: inline-block; border: 1px solid var(--accent); background: var(--accent);
+  color: var(--accent-ink); border-radius: 6px; padding: 7px 13px; font: inherit; cursor: pointer; }
+button.btn.secondary, label.btn.secondary { background: var(--paper); color: var(--accent); }
+button.btn:disabled { opacity: .5; cursor: default; }
+label.btn input[type=file] { display: none; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+select, input[type=text], input[type=number] { font: inherit; padding: 5px 7px; border: 1px solid var(--line);
+  border-radius: 5px; background: var(--paper); color: var(--ink); max-width: 100%; }
+input.id { width: 9.5em; font-family: ui-monospace, Consolas, monospace; }
+input.off { width: 5em; }
+table { border-collapse: collapse; width: 100%; background: var(--paper); }
+th, td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted);
+     background: var(--soft); position: sticky; top: 0; z-index: 1; }
+td.field .mono { color: var(--ink); }
+td.field .lab { color: var(--muted); font-size: 13px; }
+.chip { display: inline-block; border-radius: 10px; padding: 1px 9px; font-size: 12px; white-space: nowrap; }
+.chip.mapped { background: var(--ok-soft); color: var(--ok); }
+.chip.skip { background: var(--skip-soft); color: var(--skip); }
+.chip.needs { background: var(--warn-soft); color: var(--warn); }
+.chip.undecided { background: var(--undecided-soft); color: var(--undecided); }
+.chip.error { background: var(--bad-soft); color: var(--bad); }
+.chip.warning, .chip.review { background: var(--warn-soft); color: var(--warn); }
+.vname { font-size: 12.5px; margin-top: 3px; }
+.vname.ok { color: var(--ok); }
+.vname.bad { color: var(--bad); }
+.vname.none { color: var(--muted); font-style: italic; }
+.pager { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+.stat { display: inline-block; margin-right: 18px; }
+.stat b { font-size: 20px; display: block; }
+.progress { height: 10px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px;
+            overflow: hidden; margin: 8px 0; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.note { background: var(--undecided-soft); border-radius: 6px; padding: 9px 12px; margin: 10px 0; }
+.note.warn { background: var(--warn-soft); }
+.note.bad { background: var(--bad-soft); }
+.note.ok { background: var(--ok-soft); }
+pre.cmd { background: #1d2330; color: #e8ecf3; padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+a { color: var(--accent); }
+#errbanner { display: none; position: fixed; left: 0; right: 0; bottom: 0; background: var(--bad); color: #fff;
+             padding: 10px 16px; z-index: 50; font-size: 14px; white-space: pre-wrap; }
+#selftest { display: none; position: fixed; right: 12px; top: 12px; width: 460px; background: var(--paper);
+            border: 2px solid var(--accent); border-radius: 8px; padding: 12px 14px; z-index: 40;
+            font-size: 13.5px; max-height: 90vh; overflow: auto; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; align-items: center; }
+.kv select, .kv input[type=text] { max-width: 520px; }
+footer { color: var(--muted); font-size: 12.5px; padding: 0 24px 30px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>REDCap to OMOP mapping wizard</h1>
+  <p>Map a REDCap registry to the OMOP Common Data Model v5.4, check every concept id against your own
+     vocabulary download, and export the files the runner needs. Everything happens in this browser tab;
+     nothing is uploaded.</p>
+</header>
+<nav class="steps" id="steps" aria-label="Steps">
+  <button data-step="0"><span class="n">1</span>Start</button>
+  <button data-step="1"><span class="n">2</span>Project settings</button>
+  <button data-step="2"><span class="n">3</span>Map fields</button>
+  <button data-step="3"><span class="n">4</span>Check concepts</button>
+  <button data-step="4"><span class="n">5</span>Export and run</button>
+</nav>
+<main>
+
+<!-- Step 1 -->
+<section class="step" id="step0">
+  <div class="grid3">
+    <div class="card">
+      <h2>Start from your data dictionary</h2>
+      <p class="small muted">In REDCap: <b>Project Setup, Data Dictionary, Download the current Data Dictionary</b>.
+        It holds field names, labels and answer codes, and no patient data.</p>
+      <label class="btn">Choose data dictionary CSV<input type="file" id="ddFile" accept=".csv,text/csv"></label>
+    </div>
+    <div class="card">
+      <h2>Continue earlier work</h2>
+      <p class="small muted">Load a <code>mapping.csv</code> exported from this wizard (or made with
+        <code>start_mapping.py</code>), and its <code>project.json</code> if you have one.</p>
+      <div class="row">
+        <label class="btn secondary">mapping.csv<input type="file" id="mapFile" accept=".csv,text/csv"></label>
+        <label class="btn secondary">project.json<input type="file" id="projFile" accept=".json,application/json"></label>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Try the demo</h2>
+      <p class="small muted">A fictional neurology registry: four forms, radio, checkbox and yes/no fields,
+        a repeating follow-up form.</p>
+      <div class="row">
+        <button class="btn secondary" id="demoBlank">Demo, unmapped</button>
+        <button class="btn secondary" id="demoDone">Demo, mapped</button>
+        <button class="btn secondary" id="demoBad">Demo with mistakes</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" id="loadSummary" hidden></div>
+  <div class="card small muted">
+    <b>Where your work is kept.</b> Files you choose are read by this page in your browser. Your mapping is
+    saved in this browser's local storage as you work, so closing the tab does not lose it, and it stays on
+    this computer. Export it (step 5) to keep a copy or share it.
+    <div class="row"><button class="btn secondary" id="startOver">Start over (clears saved work)</button></div>
+  </div>
+</section>
+
+<!-- Step 2 -->
+<section class="step" id="step1">
+  <div class="card">
+    <h2>Person</h2>
+    <p class="small muted">OMOP needs one PERSON row per participant with a year of birth. These fields are
+      read once per record.</p>
+    <div class="kv">
+      <label for="pRecord">Record id field</label><select id="pRecord"></select>
+      <label for="pBirth">Date of birth field</label><select id="pBirth"></select>
+      <label for="pBirthYear">or year of birth field</label><select id="pBirthYear"></select>
+      <label for="pSex">Sex field</label><select id="pSex"></select>
+    </div>
+    <div id="sexCodes"></div>
+    <details><summary class="small">Race and ethnicity (optional)</summary>
+      <div class="kv" style="margin-top:8px">
+        <label for="pRace">Race field</label><select id="pRace"></select>
+        <label for="pEth">Ethnicity field</label><select id="pEth"></select>
+      </div>
+      <div id="raceCodes"></div><div id="ethCodes"></div>
+    </details>
+  </div>
+  <div class="card">
+    <h2>Forms</h2>
+    <p class="small muted">Every OMOP record needs a date. Pick the date field that dates each form's answers.
+      Give a form a visit concept if each completed form is a visit (for example 9202, Outpatient Visit).</p>
+    <table><thead><tr><th>Form</th><th>Date field</th><th>Visit concept</th></tr></thead>
+      <tbody id="formRows"></tbody></table>
+  </div>
+  <div class="card">
+    <h2>Death (optional)</h2>
+    <div class="kv">
+      <label for="dFlag">Deceased flag field</label><select id="dFlag"></select>
+      <label for="dCode">Code meaning deceased</label><select id="dCode"></select>
+      <label for="dDate">Date of death field</label><select id="dDate"></select>
+    </div>
+    <p class="small muted">OMOP requires a date of death. People flagged without one are counted in the QC report
+      and left out of DEATH.</p>
+  </div>
+  <div class="card">
+    <h2>Other</h2>
+    <div class="kv">
+      <label for="pName">Registry name</label><input type="text" id="pName" size="40">
+      <label for="pType">Type concept id</label><input type="text" class="id" id="pType">
+      <label for="pMinYear">Ignore dates before year</label><input type="number" id="pMinYear" style="width:7em">
+    </div>
+    <p class="small muted">32879 is the type concept <i>Registry</i>. Dates before the year above, and dates in the
+      future, are treated as typing errors and ignored.</p>
+  </div>
+</section>
+
+<!-- Step 3 -->
+<section class="step" id="step2">
+  <div class="card">
+    <div class="row">
+      <label>Form <select id="fForm"></select></label>
+      <label>Show <select id="fStatus">
+        <option value="all">all rows</option><option value="undecided">to decide</option>
+        <option value="needs">table set, concept missing</option><option value="mapped">mapped</option>
+        <option value="skip">skipped</option><option value="problem">problems from the check</option>
+      </select></label>
+      <label>Search <input type="text" id="fSearch" placeholder="field, label or id" size="24"></label>
+      <span id="counts" class="small muted"></span>
+    </div>
+    <div class="row">
+      <button class="btn secondary" id="copyLists" title="Fields with identical answer lists get the same mappings, where still undecided">Copy mappings to fields with the same answer list</button>
+      <button class="btn secondary" id="skipView" title="Set every undecided row in the current view to SKIP">Skip undecided rows in this view</button>
+    </div>
+    <p class="small muted">One row per field, and one per answer of a choice field. A row produces OMOP records when it
+      has a table and a concept id above 0. Leave a row undecided or 0 rather than guess: an unmapped answer is left
+      out, a wrong concept is wrong data. Checkbox answers are read from REDCap's <code>field___code</code> columns.</p>
+  </div>
+  <div class="pager" id="pagerTop"></div>
+  <table>
+    <thead><tr><th>Field</th><th>OMOP table</th><th>Concept id</th><th>Value / unit</th><th>Date</th><th>Look up</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody id="mapRows"></tbody>
+  </table>
+  <div class="pager" id="pagerBottom"></div>
+</section>
+
+<!-- Step 4 -->
+<section class="step" id="step3">
+  <div class="card">
+    <h2>Check every concept id against your vocabulary</h2>
+    <p class="small">Choose <code>CONCEPT.csv</code> from your OMOP vocabulary download
+      (<a href="https://athena.ohdsi.org/vocabulary/list" target="_blank" rel="noopener">athena.ohdsi.org</a>,
+      free with an account). The file is about 1 GB; this page reads it from your disk in a stream and keeps only the
+      rows for ids your mapping uses. It takes a minute or so.</p>
+    <div class="row">
+      <label class="btn">Choose CONCEPT.csv<input type="file" id="conceptFile" accept=".csv,.txt"></label>
+      <label class="btn secondary" title="Optional: finds the standard concept a retired or non-standard id maps to">Optional, choose first: CONCEPT_RELATIONSHIP.csv<input type="file" id="relFile" accept=".csv,.txt"></label>
+    </div>
+    <p class="small muted">With CONCEPT_RELATIONSHIP.csv (about 2 GB) the check also proposes the standard concept each retired or
+      non-standard id maps to. Choose it before CONCEPT.csv.</p>
+    <div class="progress" id="prog" hidden><div></div></div>
+    <div id="progText" class="small muted"></div>
+    <p class="small muted">Rules: an id must exist in the release, be valid and standard, and belong to the domain of the
+      table it is written to. An id used for two different answers is flagged, and so is a label that shares no words
+      with the vocabulary's name for the id, because that is how a mistyped id usually shows itself. After a check,
+      the name columns carry the vocabulary's own names.</p>
+  </div>
+  <div class="card" id="checkResults" hidden></div>
+</section>
+
+<!-- Step 5 -->
+<section class="step" id="step4">
+  <div class="card" id="readiness"></div>
+  <div class="card">
+    <h2>Export</h2>
+    <div class="row">
+      <button class="btn" id="dlMapping">Download mapping.csv</button>
+      <button class="btn" id="dlProject">Download project.json</button>
+      <button class="btn secondary" id="dlReport">Download check_report.csv</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Run it on your export</h2>
+    <p class="small">Export your data from REDCap as <b>CSV, raw data</b> (codes, not labels). Then, with Python and pandas
+      installed, on the computer where the data is allowed to be:</p>
+<pre class="cmd">python runner/redcap_to_omop.py --project project.json --mapping mapping.csv \
+    --export your_export.csv --check
+
+python runner/redcap_to_omop.py --project project.json --mapping mapping.csv \
+    --export your_export.csv --output omop_output</pre>
+    <p class="small">The first command checks the export against the mapping and writes nothing. The second writes one CSV
+      per OMOP table and a <code>qc_report.md</code>.</p>
+    <p class="small" id="kitLinks"></p>
+  </div>
+</section>
+</main>
+<footer>REDCap to OMOP Mapping Kit. Open source; see the repository for the license. The OMOP vocabularies are not
+  included: each user downloads their own from Athena under its terms. Text drafted with AI assistance.</footer>
+<div id="errbanner" role="alert"></div>
+<div id="selftest"></div>
+
+<!-- DEMO:BEGIN -->
+<script type="text/csv" id="demo-dd">
+"Variable / Field Name","Form Name","Section Header","Field Type","Field Label","Choices, Calculations, OR Slider Labels","Field Note","Text Validation Type OR Show Slider Number","Text Validation Min","Text Validation Max","Identifier?","Branching Logic (Show field only if...)","Required Field?","Custom Alignment","Question Number (surveys only)","Matrix Group Name","Matrix Ranking?","Field Annotation"
+"record_id","enrollment","","text","Record ID","","","","","","","","","","","","",""
+"dob","enrollment","","text","Date of birth","","","date_ymd","","","y","","y","","","","",""
+"sex","enrollment","","radio","Sex","1, Male | 2, Female | 3, Other","","","","","","","y","","","","",""
+"enroll_date","enrollment","","text","Enrollment date","","","date_ymd","","","","","y","","","","",""
+"primary_dx","enrollment","","radio","Primary diagnosis","1, Epilepsy | 2, Migraine | 3, Multiple sclerosis | 4, Other","","","","","","","","","","","",""
+"dx_date","enrollment","","text","Date of diagnosis","","","date_ymd","","","","[primary_dx] <> ''","","","","","",""
+"base_date","baseline","","text","Baseline visit date","","","date_ymd","","","","","y","","","","",""
+"base_header","baseline","<h4>History</h4>","descriptive","Answer for the participant's history up to this visit.","","","","","","","","","","","","",""
+"comorbid","baseline","","checkbox","Comorbidities <i>(check all that apply)</i>","1, Hypertension | 2, Diabetes | 3, Depression | 4, Anxiety | 99, Other","","","","","","","","","","","",""
+"meds","baseline","","checkbox","Current medications","1, Levetiracetam | 2, Lamotrigine | 3, Valproate | 4, Topiramate | 99, Other","","","","","","","","","","","",""
+"meds_other","baseline","","text","Other medication, specify","","","","","","","[meds(99)] = '1'","","","","","",""
+"weight","baseline","","text","Weight (kg)","","","number","20","300","","","","","","","",""
+"height","baseline","","text","Height (cm)","","","number","50","250","","","","","","","",""
+"smoker","baseline","","yesno","Current smoker?","","","","","","","","","","","","",""
+"eeg_done","baseline","","yesno","EEG performed?","","","","","","","","","","","","",""
+"mri_done","baseline","","yesno","Brain MRI performed?","","","","","","","","","","","","",""
+"sz_per_month","baseline","","text","Seizures per month","","","integer","0","999","","[primary_dx] = '1'","","","","","",""
+"fu_date","follow_up","","text","Follow-up date","","","date_ymd","","","","","y","","","","",""
+"fu_new_meds","follow_up","","checkbox","New medications since the last visit","1, Levetiracetam | 2, Lamotrigine | 3, Valproate | 4, Topiramate | 99, Other","","","","","","","","","","","",""
+"fu_weight","follow_up","","text","Weight (kg)","","","number","20","300","","","","","","","",""
+"fu_hosp","follow_up","","yesno","Hospitalized since the last visit?","","","","","","","","","","","","",""
+"deceased","end_of_study","","yesno","Has the participant died?","","","","","","","","","","","","",""
+"death_date","end_of_study","","text","Date of death","","","date_ymd","","","","[deceased] = '1'","","","","","",""
+"study_notes","end_of_study","","notes","Notes","","","","","","","","","","","","",""
+</script>
+<script type="text/csv" id="demo-mapping-blank">
+form,field,field_type,validation,field_label,choice_code,choice_label,omop_table,concept_id,concept_name,value_concept_id,value_concept_name,unit_concept_id,unit_concept_name,date_field,date_offset_days,notes
+enrollment,record_id,text,,Record ID,,,SKIP,,,,,,,,,record id
+enrollment,dob,text,date_ymd,Date of birth,,,,,,,,,,,,
+enrollment,sex,radio,,Sex,1,Male,,,,,,,,,,
+enrollment,sex,radio,,Sex,2,Female,,,,,,,,,,
+enrollment,sex,radio,,Sex,3,Other,,,,,,,,,,
+enrollment,enroll_date,text,date_ymd,Enrollment date,,,,,,,,,,,,
+enrollment,primary_dx,radio,,Primary diagnosis,1,Epilepsy,,,,,,,,,,
+enrollment,primary_dx,radio,,Primary diagnosis,2,Migraine,,,,,,,,,,
+enrollment,primary_dx,radio,,Primary diagnosis,3,Multiple sclerosis,,,,,,,,,,
+enrollment,primary_dx,radio,,Primary diagnosis,4,Other,,,,,,,,,,
+enrollment,dx_date,text,date_ymd,Date of diagnosis,,,,,,,,,,,,
+baseline,base_date,text,date_ymd,Baseline visit date,,,,,,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),1,Hypertension,,,,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),2,Diabetes,,,,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),3,Depression,,,,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),4,Anxiety,,,,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),99,Other,,,,,,,,,,
+baseline,meds,checkbox,,Current medications,1,Levetiracetam,,,,,,,,,,
+baseline,meds,checkbox,,Current medications,2,Lamotrigine,,,,,,,,,,
+baseline,meds,checkbox,,Current medications,3,Valproate,,,,,,,,,,
+baseline,meds,checkbox,,Current medications,4,Topiramate,,,,,,,,,,
+baseline,meds,checkbox,,Current medications,99,Other,,,,,,,,,,
+baseline,meds_other,text,,"Other medication, specify",,,,,,,,,,,,
+baseline,weight,text,number,Weight (kg),,,,,,,,,,,,
+baseline,height,text,number,Height (cm),,,,,,,,,,,,
+baseline,smoker,yesno,,Current smoker?,1,Yes,,,,,,,,,,
+baseline,smoker,yesno,,Current smoker?,0,No,,,,,,,,,,
+baseline,eeg_done,yesno,,EEG performed?,1,Yes,,,,,,,,,,
+baseline,eeg_done,yesno,,EEG performed?,0,No,,,,,,,,,,
+baseline,mri_done,yesno,,Brain MRI performed?,1,Yes,,,,,,,,,,
+baseline,mri_done,yesno,,Brain MRI performed?,0,No,,,,,,,,,,
+baseline,sz_per_month,text,integer,Seizures per month,,,,,,,,,,,,
+follow_up,fu_date,text,date_ymd,Follow-up date,,,,,,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,1,Levetiracetam,,,,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,2,Lamotrigine,,,,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,3,Valproate,,,,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,4,Topiramate,,,,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,99,Other,,,,,,,,,,
+follow_up,fu_weight,text,number,Weight (kg),,,,,,,,,,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,1,Yes,,,,,,,,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,0,No,,,,,,,,,,
+end_of_study,deceased,yesno,,Has the participant died?,1,Yes,,,,,,,,,,
+end_of_study,deceased,yesno,,Has the participant died?,0,No,,,,,,,,,,
+end_of_study,death_date,text,date_ymd,Date of death,,,,,,,,,,,,
+end_of_study,study_notes,notes,,Notes,,,,,,,,,,,,
+</script>
+<script type="text/csv" id="demo-mapping">
+form,field,field_type,validation,field_label,choice_code,choice_label,omop_table,concept_id,concept_name,value_concept_id,value_concept_name,unit_concept_id,unit_concept_name,date_field,date_offset_days,notes
+enrollment,record_id,text,,Record ID,,,SKIP,,,,,,,,,record id
+enrollment,dob,text,date_ymd,Date of birth,,,SKIP,,,,,,,,,person: birth date
+enrollment,sex,radio,,Sex,1,Male,SKIP,,,,,,,,,person: sex
+enrollment,sex,radio,,Sex,2,Female,SKIP,,,,,,,,,person: sex
+enrollment,sex,radio,,Sex,3,Other,SKIP,,,,,,,,,person: sex
+enrollment,enroll_date,text,date_ymd,Enrollment date,,,SKIP,,,,,,,,,form date (enrollment)
+enrollment,primary_dx,radio,,Primary diagnosis,1,Epilepsy,CONDITION_OCCURRENCE,380378,Epilepsy,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,2,Migraine,CONDITION_OCCURRENCE,318736,Migraine,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,3,Multiple sclerosis,CONDITION_OCCURRENCE,374919,Multiple sclerosis,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,4,Other,CONDITION_OCCURRENCE,0,,,,,,dx_date,,no single standard concept for 'Other'
+enrollment,dx_date,text,date_ymd,Date of diagnosis,,,SKIP,,,,,,,,,date for primary_dx
+baseline,base_date,text,date_ymd,Baseline visit date,,,SKIP,,,,,,,,,form date (baseline)
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),1,Hypertension,CONDITION_OCCURRENCE,316866,Hypertensive disorder,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),2,Diabetes,CONDITION_OCCURRENCE,201820,Diabetes mellitus,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),3,Depression,CONDITION_OCCURRENCE,440383,Depressive disorder,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),4,Anxiety,CONDITION_OCCURRENCE,442077,Anxiety disorder,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),99,Other,CONDITION_OCCURRENCE,0,,,,,,,,no single standard concept for 'Other'
+baseline,meds,checkbox,,Current medications,1,Levetiracetam,DRUG_EXPOSURE,711584,levetiracetam,,,,,,,
+baseline,meds,checkbox,,Current medications,2,Lamotrigine,DRUG_EXPOSURE,705103,lamotrigine,,,,,,,
+baseline,meds,checkbox,,Current medications,3,Valproate,DRUG_EXPOSURE,745466,valproate,,,,,,,
+baseline,meds,checkbox,,Current medications,4,Topiramate,DRUG_EXPOSURE,742267,topiramate,,,,,,,
+baseline,meds,checkbox,,Current medications,99,Other,DRUG_EXPOSURE,0,,,,,,,,'Other' is free text in meds_other
+baseline,meds_other,text,,"Other medication, specify",,,SKIP,,,,,,,,,free text; no concept without review
+baseline,weight,text,number,Weight (kg),,,MEASUREMENT,3025315,Body weight,,,9529,kilogram,,,
+baseline,height,text,number,Height (cm),,,MEASUREMENT,3036277,Body height,,,8582,centimeter,,,
+baseline,smoker,yesno,,Current smoker?,1,Yes,OBSERVATION,43054909,Tobacco smoking status,4188539,Yes,,,,,
+baseline,smoker,yesno,,Current smoker?,0,No,OBSERVATION,43054909,Tobacco smoking status,4188540,No,,,,,
+baseline,eeg_done,yesno,,EEG performed?,1,Yes,PROCEDURE_OCCURRENCE,4181917,Electroencephalogram,,,,,,,
+baseline,eeg_done,yesno,,EEG performed?,0,No,SKIP,,,,,,,,,not done: nothing to record
+baseline,mri_done,yesno,,Brain MRI performed?,1,Yes,PROCEDURE_OCCURRENCE,37311324,MRI of brain,,,,,,,
+baseline,mri_done,yesno,,Brain MRI performed?,0,No,SKIP,,,,,,,,,not done: nothing to record
+baseline,sz_per_month,text,integer,Seizures per month,,,OBSERVATION,0,,,,,,,,no standard concept chosen yet for seizure frequency
+follow_up,fu_date,text,date_ymd,Follow-up date,,,SKIP,,,,,,,,,form date (follow_up)
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,1,Levetiracetam,DRUG_EXPOSURE,711584,levetiracetam,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,2,Lamotrigine,DRUG_EXPOSURE,705103,lamotrigine,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,3,Valproate,DRUG_EXPOSURE,745466,valproate,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,4,Topiramate,DRUG_EXPOSURE,742267,topiramate,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,99,Other,DRUG_EXPOSURE,0,,,,,,,,'Other' is free text in meds_other
+follow_up,fu_weight,text,number,Weight (kg),,,MEASUREMENT,3025315,Body weight,,,9529,kilogram,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,1,Yes,,,,,,,,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,0,No,SKIP,,,,,,,,,no hospital stay: nothing to record
+end_of_study,deceased,yesno,,Has the participant died?,1,Yes,SKIP,,,,,,,,,death: flag
+end_of_study,deceased,yesno,,Has the participant died?,0,No,SKIP,,,,,,,,,death: flag
+end_of_study,death_date,text,date_ymd,Date of death,,,SKIP,,,,,,,,,death: date
+end_of_study,study_notes,notes,,Notes,,,SKIP,,,,,,,,,free text
+</script>
+<script type="text/csv" id="demo-mapping-mistakes">
+form,field,field_type,validation,field_label,choice_code,choice_label,omop_table,concept_id,concept_name,value_concept_id,value_concept_name,unit_concept_id,unit_concept_name,date_field,date_offset_days,notes
+enrollment,record_id,text,,Record ID,,,SKIP,,,,,,,,,record id
+enrollment,dob,text,date_ymd,Date of birth,,,SKIP,,,,,,,,,person: birth date
+enrollment,sex,radio,,Sex,1,Male,SKIP,,,,,,,,,person: sex
+enrollment,sex,radio,,Sex,2,Female,SKIP,,,,,,,,,person: sex
+enrollment,sex,radio,,Sex,3,Other,SKIP,,,,,,,,,person: sex
+enrollment,enroll_date,text,date_ymd,Enrollment date,,,SKIP,,,,,,,,,form date (enrollment)
+enrollment,primary_dx,radio,,Primary diagnosis,1,Epilepsy,CONDITION_OCCURRENCE,380378,Epilepsy,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,2,Migraine,CONDITION_OCCURRENCE,99999999,Migraine,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,3,Multiple sclerosis,CONDITION_OCCURRENCE,374919,Multiple sclerosis,,,,,dx_date,,
+enrollment,primary_dx,radio,,Primary diagnosis,4,Other,CONDITION_OCCURRENCE,0,,,,,,dx_date,,no single standard concept for 'Other'
+enrollment,dx_date,text,date_ymd,Date of diagnosis,,,SKIP,,,,,,,,,date for primary_dx
+baseline,base_date,text,date_ymd,Baseline visit date,,,SKIP,,,,,,,,,form date (baseline)
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),1,Hypertension,CONDITION_OCCURRENCE,4152194,Hypertension,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),2,Diabetes,CONDITION_OCCURRENCE,201820,Diabetes mellitus,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),3,Depression,CONDITION_OCCURRENCE,766349,Depression,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),4,Anxiety,CONDITION_OCCURRENCE,442077,Anxiety disorder,,,,,,,
+baseline,comorbid,checkbox,,Comorbidities (check all that apply),99,Other,CONDITION_OCCURRENCE,442077,Anxiety disorder,,,,,,,
+baseline,meds,checkbox,,Current medications,1,Levetiracetam,DRUG_EXPOSURE,1546440,levetiracetam,,,,,,,
+baseline,meds,checkbox,,Current medications,2,Lamotrigine,DRUG_EXPOSURE,705103,lamotrigine,,,,,,,
+baseline,meds,checkbox,,Current medications,3,Valproate,DRUG_EXPOSURE,745466,valproate,,,,,,,
+baseline,meds,checkbox,,Current medications,4,Topiramate,DRUG_EXPOSURE,742267,topiramate,,,,,,,
+baseline,meds,checkbox,,Current medications,99,Other,DRUG_EXPOSURE,0,,,,,,,,'Other' is free text in meds_other
+baseline,meds_other,text,,"Other medication, specify",,,SKIP,,,,,,,,,free text; no concept without review
+baseline,weight,text,number,Weight (kg),,,OBSERVATION,3025315,Body weight,,,9529,kilogram,,,
+baseline,height,text,number,Height (cm),,,MEASUREMENT,3036277,Body height,,,8582,centimeter,,,
+baseline,smoker,yesno,,Current smoker?,1,Yes,OBSERVATION,43054909,Tobacco smoking status,4188539,Yes,,,,,
+baseline,smoker,yesno,,Current smoker?,0,No,OBSERVATION,43054909,Tobacco smoking status,4188540,No,,,,,
+baseline,eeg_done,yesno,,EEG performed?,1,Yes,PROCEDURE_OCCURRENCE,4181917,Electroencephalogram,,,,,,,
+baseline,eeg_done,yesno,,EEG performed?,0,No,SKIP,,,,,,,,,not done: nothing to record
+baseline,mri_done,yesno,,Brain MRI performed?,1,Yes,PROCEDURE_OCCURRENCE,37311324,MRI of brain,,,,,,,
+baseline,mri_done,yesno,,Brain MRI performed?,0,No,SKIP,,,,,,,,,not done: nothing to record
+baseline,sz_per_month,text,integer,Seizures per month,,,OBSERVATION,0,,,,,,,,no standard concept chosen yet for seizure frequency
+follow_up,fu_date,text,date_ymd,Follow-up date,,,SKIP,,,,,,,,,form date (follow_up)
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,1,Levetiracetam,DRUG_EXPOSURE,711584,levetiracetam,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,2,Lamotrigine,DRUG_EXPOSURE,705103,lamotrigine,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,3,Valproate,DRUG_EXPOSURE,745466,valproate,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,4,Topiramate,DRUG_EXPOSURE,742267,topiramate,,,,,,,
+follow_up,fu_new_meds,checkbox,,New medications since the last visit,99,Other,DRUG_EXPOSURE,0,,,,,,,,'Other' is free text in meds_other
+follow_up,fu_weight,text,number,Weight (kg),,,MEASUREMENT,3025315,Body weight,,,9529,kilogram,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,1,Yes,,,,,,,,,,
+follow_up,fu_hosp,yesno,,Hospitalized since the last visit?,0,No,SKIP,,,,,,,,,no hospital stay: nothing to record
+end_of_study,deceased,yesno,,Has the participant died?,1,Yes,SKIP,,,,,,,,,death: flag
+end_of_study,deceased,yesno,,Has the participant died?,0,No,SKIP,,,,,,,,,death: flag
+end_of_study,death_date,text,date_ymd,Date of death,,,SKIP,,,,,,,,,death: date
+end_of_study,study_notes,notes,,Notes,,,SKIP,,,,,,,,,free text
+</script>
+<script type="application/json" id="demo-project">
+{
+  "format": "redcap-omop-mapping-kit/1",
+  "registry_name": "Demo neurology registry (fictional)",
+  "record_id_field": "record_id",
+  "type_concept_id": 32879,
+  "min_year": 1900,
+  "person": {
+    "birth_date_field": "dob",
+    "sex_field": "sex",
+    "sex_concepts": {
+      "1": 8507,
+      "2": 8532,
+      "3": 0
+    }
+  },
+  "forms": {
+    "enrollment": {
+      "date_field": "enroll_date",
+      "visit_concept_id": 0
+    },
+    "baseline": {
+      "date_field": "base_date",
+      "visit_concept_id": 9202
+    },
+    "follow_up": {
+      "date_field": "fu_date",
+      "visit_concept_id": 9202
+    },
+    "end_of_study": {
+      "date_field": "",
+      "visit_concept_id": 0
+    }
+  },
+  "death": {
+    "flag_field": "deceased",
+    "flag_code": "1",
+    "date_field": "death_date"
+  }
+}
+</script>
+<!-- DEMO:END -->
+
+<script>
+"use strict";
+// ---------------------------------------------------------------------------
+// Fail loudly: a script error otherwise leaves a page that looks fine and does nothing.
+// ---------------------------------------------------------------------------
+const ERRORS = [];
+function showError(msg) {
+  if (/ResizeObserver loop/.test(msg)) return;
+  ERRORS.push(msg);
+  const b = document.getElementById("errbanner");
+  b.style.display = "block";
+  b.textContent = "Something went wrong on this page: " + ERRORS.join("\n");
+}
+window.addEventListener("error", e => showError(`${e.message} (${(e.filename || "").split("/").pop()}:${e.lineno})`));
+window.addEventListener("unhandledrejection", e => showError(String(e.reason && e.reason.stack || e.reason)));
+
+// ---------------------------------------------------------------------------
+// Constants shared with the Python tools. Keep them in step with
+// tools/start_mapping.py, tools/check_concepts.py and runner/redcap_to_omop.py.
+// ---------------------------------------------------------------------------
+const FORMAT = "redcap-omop-mapping-kit/1";
+const COLUMNS = ["form", "field", "field_type", "validation", "field_label", "choice_code",
+  "choice_label", "omop_table", "concept_id", "concept_name", "value_concept_id",
+  "value_concept_name", "unit_concept_id", "unit_concept_name", "date_field",
+  "date_offset_days", "notes"];
+const TABLES = ["CONDITION_OCCURRENCE", "DRUG_EXPOSURE", "PROCEDURE_OCCURRENCE", "OBSERVATION", "MEASUREMENT"];
+const TABLE_DOMAIN = { CONDITION_OCCURRENCE: "Condition", DRUG_EXPOSURE: "Drug",
+  PROCEDURE_OCCURRENCE: "Procedure", OBSERVATION: "Observation", MEASUREMENT: "Measurement" };
+const HEADERS = {
+  field: ["variable / field name", "field_name"], form: ["form name", "form_name"],
+  type: ["field type", "field_type"], label: ["field label", "field_label"],
+  choices: ["choices, calculations, or slider labels", "select_choices_or_calculations"],
+  validation: ["text validation type or show slider number", "text_validation_type_or_show_slider_number"],
+};
+const LEAVE_OUT = new Set(["descriptive", "file"]);
+const FIXED_CHOICES = { yesno: [["1", "Yes"], ["0", "No"]], truefalse: [["1", "True"], ["0", "False"]] };
+const GENERIC_ANSWERS = new Set(["yes", "no", "true", "false", "checked", "present", "absent", "y", "n", "done"]);
+const STOP = new Set(("of the a an and or with in on for to at by per current currently performed since last " +
+  "visit check all that apply other specify any ever has have had is was were been did do does type kg cm mg " +
+  "date new").split(" "));
+const ALIASES = { eeg: "electroencephalogram", ecg: "electrocardiogram", ekg: "electrocardiogram",
+  mri: "magnetic resonance mri", ct: "computed tomography", bp: "blood pressure", bmi: "body mass index",
+  hr: "heart rate", dx: "diagnosis", hx: "history", tbi: "traumatic brain injury", ms: "multiple sclerosis",
+  copd: "chronic obstructive pulmonary disease" };
+const VISITS = [["0", "none"], ["9202", "9202 Outpatient Visit"], ["9201", "9201 Inpatient Visit"],
+  ["9203", "9203 Emergency Room Visit"], ["581477", "581477 Office Visit"], ["722455", "722455 Telehealth"]];
+const PAGE = 60;
+const STORE = "redcap-omop-mapping-kit/1";
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let S = blankState();
+function blankState() {
+  return { source: "", rows: [], project: blankProject(), vocab: null, issues: [],
+           ui: { step: 0, form: "", status: "all", search: "", page: 0 } };
+}
+function blankProject() {
+  return { format: FORMAT, registry_name: "", record_id_field: "", type_concept_id: 32879, min_year: 1900,
+           person: { birth_date_field: "", sex_field: "", sex_concepts: {} },
+           forms: {}, death: { flag_field: "", flag_code: "1", date_field: "" } };
+}
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { /* storage full or blocked */ }
+  }, 300);
+}
+function restore() {
+  try {
+    const raw = localStorage.getItem(STORE);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.rows)) return false;
+    S = Object.assign(blankState(), s);
+    S.ui = Object.assign(blankState().ui, s.ui || {});
+    return true;
+  } catch (e) { return false; }
+}
+
+// ---------------------------------------------------------------------------
+// CSV
+// ---------------------------------------------------------------------------
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = []; let row = [], field = "", i = 0, q = false;
+  while (i < text.length) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i += 2; continue; } q = false; i++; continue; }
+      field += c; i++; continue;
+    }
+    if (c === '"') { q = true; i++; continue; }
+    if (c === ",") { row.push(field); field = ""; i++; continue; }
+    if (c === "\r") { i++; continue; }
+    if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+    field += c; i++;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function csvCell(v) {
+  const s = v == null ? "" : String(v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function toCSV(header, records) {
+  return [header.map(csvCell).join(","), ...records.map(r => header.map(h => csvCell(r[h])).join(","))].join("\n") + "\n";
+}
+function recordsFromCSV(text) {
+  const rows = parseCSV(text);
+  const head = rows[0].map(h => h.trim());
+  return rows.slice(1).filter(r => r.some(c => c.trim() !== "")).map(r => {
+    const o = {}; head.forEach((h, i) => { o[h] = (r[i] || "").trim(); }); return o;
+  });
+}
+async function readText(file) {
+  const buf = await file.arrayBuffer();
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(buf); }
+  catch (e) { return new TextDecoder("windows-1252").decode(buf); }
+}
+
+// ---------------------------------------------------------------------------
+// Data dictionary to mapping rows (same rules as tools/start_mapping.py)
+// ---------------------------------------------------------------------------
+function clean(t) { return (t || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(); }
+function parseChoices(t) {
+  const out = [];
+  for (let part of (t || "").split("|")) {
+    part = part.trim(); if (!part) continue;
+    const k = part.indexOf(",");
+    if (k < 0) out.push([part.trim(), clean(part)]);
+    else out.push([part.slice(0, k).trim(), clean(part.slice(k + 1))]);
+  }
+  return out;
+}
+function expandDD(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) throw new Error("the data dictionary is empty");
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const col = {};
+  for (const [key, names] of Object.entries(HEADERS)) {
+    const hit = names.find(n => header.includes(n));
+    if (!hit) throw new Error(`no '${names[0]}' column: is this a REDCap data dictionary?`);
+    col[key] = header.indexOf(hit);
+  }
+  const out = []; let first = true;
+  for (let r of rows.slice(1)) {
+    if (!r.some(c => c.trim() !== "")) continue;
+    while (r.length < header.length) r.push("");
+    const ftype = r[col.type].trim().toLowerCase();
+    const base = Object.fromEntries(COLUMNS.map(c => [c, ""]));
+    Object.assign(base, { form: r[col.form].trim(), field: r[col.field].trim(), field_type: ftype,
+      validation: r[col.validation].trim().toLowerCase(), field_label: clean(r[col.label]) });
+    if (first) { first = false; out.push(Object.assign({}, base, { omop_table: "SKIP", notes: "record id" })); continue; }
+    if (LEAVE_OUT.has(ftype)) continue;
+    let choices = [];
+    if (FIXED_CHOICES[ftype]) choices = FIXED_CHOICES[ftype];
+    else if (["radio", "dropdown", "checkbox"].includes(ftype)) choices = parseChoices(r[col.choices]);
+    if (choices.length) for (const [c, lab] of choices) out.push(Object.assign({}, base, { choice_code: c, choice_label: lab }));
+    else out.push(base);
+  }
+  return out;
+}
+function normalizeRows(recs) {
+  return recs.map(r => {
+    const o = Object.fromEntries(COLUMNS.map(c => [c, (r[c] || "").trim()]));
+    o.omop_table = o.omop_table.toUpperCase();
+    return o;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Derived facts
+// ---------------------------------------------------------------------------
+function toInt(v) { const n = parseInt(String(v || "").trim(), 10); return isNaN(n) ? 0 : n; }
+function isDateField(r) { return r.field_type === "text" && r.validation.startsWith("date"); }
+function forms() { const s = []; for (const r of S.rows) if (!s.includes(r.form)) s.push(r.form); return s; }
+function fieldsWhere(pred) { const seen = new Set(), out = []; for (const r of S.rows) if (!seen.has(r.field) && pred(r)) { seen.add(r.field); out.push(r); } return out; }
+function choicesOf(field) { return S.rows.filter(r => r.field === field && r.choice_code !== ""); }
+function status(r) {
+  if (r.omop_table === "SKIP") return "skip";
+  if (TABLES.includes(r.omop_table)) return toInt(r.concept_id) > 0 ? "mapped" : "needs";
+  return "undecided";
+}
+const STATUS_TEXT = { mapped: "mapped", skip: "skipped", needs: "concept missing", undecided: "to decide" };
+function rowKey(r) { return r.field + "\u0001" + r.choice_code; }
+function rowLabel(r) {
+  const lab = r.choice_label;
+  if (!lab || GENERIC_ANSWERS.has(lab.trim().toLowerCase())) return r.field_label;
+  return lab;
+}
+function formDate(form) { return ((S.project.forms || {})[form] || {}).date_field || ""; }
+function rowDateField(r) {
+  if (isDateField(r) && !r.choice_code) return r.field;
+  return r.date_field || formDate(r.form);
+}
+
+// ---------------------------------------------------------------------------
+// Concept check (same rules as tools/check_concepts.py)
+// ---------------------------------------------------------------------------
+function words(t) {
+  const out = new Set();
+  for (const w of (t || "").toLowerCase().match(/[a-z0-9]+/g) || []) {
+    if (STOP.has(w) || w.length < 2) continue;
+    out.add(w);
+    for (const a of (ALIASES[w] || "").split(" ")) if (a) out.add(a);
+  }
+  return out;
+}
+function shareWords(label, name) {
+  const a = words(label), b = words(name);
+  if (!a.size || !b.size) return true;
+  for (const w of a) if (b.has(w)) return true;
+  const stems = s => new Set([...s].filter(w => w.length >= 4).map(w => w.slice(0, 4)));
+  const sb = stems(b);
+  for (const w of stems(a)) if (sb.has(w)) return true;
+  return false;
+}
+function conceptUses() {
+  const out = [];
+  for (const r of S.rows) {
+    if (!TABLES.includes(r.omop_table)) continue;
+    const where = { form: r.form, field: r.field, choice_code: r.choice_code, label: rowLabel(r), table: r.omop_table };
+    for (const [role, col, domain] of [["concept", "concept_id", TABLE_DOMAIN[r.omop_table]], ["value", "value_concept_id", null], ["unit", "unit_concept_id", "Unit"]]) {
+      const id = toInt(r[col]);
+      if (id > 0) out.push(Object.assign({}, where, { role, concept_id: id, domain }));
+    }
+  }
+  const p = S.project, person = p.person || {};
+  for (const [key, domain] of [["sex_concepts", "Gender"], ["race_concepts", "Race"], ["ethnicity_concepts", "Ethnicity"]]) {
+    for (const [code, id] of Object.entries(person[key] || {})) if (toInt(id) > 0)
+      out.push({ form: "project.json", field: "person." + key, choice_code: String(code), label: "", table: "PERSON", role: "project", concept_id: toInt(id), domain });
+  }
+  for (const [form, cfg] of Object.entries(p.forms || {})) if (toInt(cfg.visit_concept_id) > 0)
+    out.push({ form: "project.json", field: "forms." + form, choice_code: "", label: "", table: "VISIT_OCCURRENCE", role: "project", concept_id: toInt(cfg.visit_concept_id), domain: "Visit" });
+  if (toInt(p.type_concept_id) > 0)
+    out.push({ form: "project.json", field: "type_concept_id", choice_code: "", label: "", table: "all", role: "project", concept_id: toInt(p.type_concept_id), domain: "Type Concept" });
+  return out;
+}
+function runRules() {
+  if (!S.vocab) { S.issues = []; return; }
+  const V = S.vocab.concepts, issues = [], used = conceptUses();
+  const add = (u, severity, message, v) => issues.push({ form: u.form, field: u.field, choice_code: u.choice_code,
+    label: u.label, table: u.table, role: u.role, concept_id: u.concept_id,
+    vocab_name: v ? v.concept_name : "", vocab_domain: v ? v.domain_id : "", vocab_vocabulary: v ? v.vocabulary_id : "",
+    severity, message, suggestion: suggestionText(u.concept_id), checked: !!S.vocab.looked[u.concept_id] });
+  for (const u of used) {
+    if (!S.vocab.looked[u.concept_id]) { issues.push({ form: u.form, field: u.field, choice_code: u.choice_code, label: u.label,
+      table: u.table, role: u.role, concept_id: u.concept_id, vocab_name: "", vocab_domain: "", vocab_vocabulary: "",
+      severity: "unchecked", message: "changed since the last check: run the check again", suggestion: "", checked: false }); continue; }
+    const v = V[u.concept_id];
+    if (!v) { add(u, "error", "not in this vocabulary release"); continue; }
+    if (v.invalid_reason === "D" || v.invalid_reason === "U")
+      add(u, "error", v.invalid_reason === "D" ? "deprecated" : "upgraded: replaced by another concept", v);
+    else if (v.standard_concept !== "S")
+      add(u, "error", "non-standard: OMOP *_concept_id columns need a standard concept", v);
+    if (u.domain && v.domain_id !== u.domain)
+      add(u, "error", `domain is ${v.domain_id}, but this is written where ${u.domain} belongs (${u.table})`, v);
+    if (u.role === "concept" && !shareWords(u.label, v.concept_name))
+      add(u, "review", "the label and the vocabulary's name share no words", v);
+  }
+  const labels = {};
+  for (const u of used) if (u.role === "concept") (labels[u.concept_id] = labels[u.concept_id] || new Set()).add(u.label.trim().toLowerCase());
+  for (const u of used) if (u.role === "concept" && labels[u.concept_id].size > 1 && S.vocab.looked[u.concept_id]) {
+    const others = [...labels[u.concept_id]].filter(l => l !== u.label.trim().toLowerCase()).sort().slice(0, 3);
+    add(u, "warning", "the same id is used for different answers: " + others.join("; "), V[u.concept_id]);
+  }
+  S.issues = issues;
+}
+function suggestionText(id) {
+  if (!S.vocab || !S.vocab.replacements || !S.vocab.replacements[id]) return "";
+  return S.vocab.replacements[id].map(t => { const v = S.vocab.concepts[t] || {}; return `${t} ${v.concept_name || ""} (${v.domain_id || ""})`; }).join("; ");
+}
+function issuesFor(r) { return S.issues.filter(i => i.field === r.field && i.choice_code === r.choice_code && i.form === r.form); }
+function fillNames() {
+  if (!S.vocab) return;
+  for (const r of S.rows) for (const [idc, nc] of [["concept_id", "concept_name"], ["value_concept_id", "value_concept_name"], ["unit_concept_id", "unit_concept_name"]]) {
+    const v = S.vocab.concepts[toInt(r[idc])]; if (v) r[nc] = v.concept_name;
+  }
+}
+
+// Streams a tab-separated Athena file line by line, keeping memory small.
+async function streamTSV(stream, total, onHeader, onLine, onProgress) {
+  const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+  let buf = "", seen = 0, header = null, last = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    seen += value.length; buf += value;
+    let nl;
+    let start = 0;
+    while ((nl = buf.indexOf("\n", start)) >= 0) {
+      let line = buf.slice(start, nl); start = nl + 1;
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (header === null) { header = line.split("\t"); onHeader(header); continue; }
+      onLine(line);
+    }
+    buf = buf.slice(start);
+    if (seen - last > 4e6) { last = seen; onProgress(seen, total); await new Promise(r => setTimeout(r, 0)); }
+  }
+  if (buf && header !== null) onLine(buf.replace(/\r$/, ""));
+  onProgress(total, total);
+}
+async function lookupConcepts(source, ids, label) {
+  const want = new Set([...ids].map(String)); const found = {}; let idx = {};
+  await streamTSV(source.stream, source.size, h => { h.forEach((c, i) => idx[c.trim()] = i); },
+    line => {
+      const tab = line.indexOf("\t"); const id = line.slice(0, tab);
+      if (!want.has(id)) return;
+      const f = line.split("\t");
+      found[+id] = { concept_id: +id, concept_name: f[idx.concept_name], domain_id: f[idx.domain_id],
+        vocabulary_id: f[idx.vocabulary_id], concept_class_id: f[idx.concept_class_id],
+        standard_concept: f[idx.standard_concept] || "", invalid_reason: f[idx.invalid_reason] || "" };
+    }, (a, b) => progress(a, b, label));
+  return found;
+}
+async function lookupReplacements(source, ids) {
+  const want = new Set([...ids].map(String)); const out = {}; let idx = {};
+  await streamTSV(source.stream, source.size, h => { h.forEach((c, i) => idx[c.trim()] = i); },
+    line => {
+      const tab = line.indexOf("\t"); const id = line.slice(0, tab);
+      if (!want.has(id)) return;
+      const f = line.split("\t");
+      const rel = f[idx.relationship_id];
+      if ((rel === "Maps to" || rel === "Concept replaced by") && !(f[idx.invalid_reason] || "")) {
+        const t = +f[idx.concept_id_2]; (out[+id] = out[+id] || []); if (!out[+id].includes(t)) out[+id].push(t);
+      }
+    }, (a, b) => progress(a, b, "Reading CONCEPT_RELATIONSHIP.csv"));
+  return out;
+}
+function progress(a, b, label) {
+  const p = document.getElementById("prog"); p.hidden = false;
+  p.firstElementChild.style.width = (b ? Math.min(100, 100 * a / b) : 0) + "%";
+  document.getElementById("progText").textContent = `${label}: ${(a / 1e6).toFixed(0)} of ${(b / 1e6).toFixed(0)} MB`;
+}
+function fileSource(file) { return () => ({ stream: file.stream(), size: file.size }); }
+function urlSource(url) {
+  return async () => { const r = await fetch(url); if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+    return { stream: r.body, size: +(r.headers.get("content-length") || 0) }; };
+}
+async function runCheck(conceptSrc, relSrc, releaseName) {
+  const used = conceptUses(); const ids = new Set(used.map(u => u.concept_id));
+  const t0 = Date.now();
+  const concepts = await lookupConcepts(await conceptSrc(), ids, "Reading CONCEPT.csv");
+  const looked = {}; for (const id of ids) looked[id] = true;
+  S.vocab = { release: releaseName, checked_at: new Date().toISOString().slice(0, 10), concepts, looked, replacements: {} };
+  runRules();
+  if (relSrc) {
+    const bad = new Set(S.issues.filter(i => i.severity === "error" && /standard|deprecated|upgraded/.test(i.message)).map(i => i.concept_id));
+    if (bad.size) {
+      const rep = await lookupReplacements(await relSrc(), bad);
+      const targets = new Set(); for (const ts of Object.values(rep)) ts.forEach(t => targets.add(t));
+      if (targets.size) {
+        const more = await lookupConcepts(await conceptSrc(), targets, "Reading CONCEPT.csv for replacements");
+        Object.assign(S.vocab.concepts, more); for (const t of targets) S.vocab.looked[t] = true;
+      }
+      S.vocab.replacements = rep;
+    }
+  }
+  fillNames(); runRules(); save();
+  document.getElementById("progText").textContent = `Checked ${ids.size} concept ids in ${((Date.now() - t0) / 1000).toFixed(0)} s.`;
+  return S.issues;
+}
+
+// ---------------------------------------------------------------------------
+// Loading
+// ---------------------------------------------------------------------------
+function demo(id) { return document.getElementById(id).textContent.replace(/^\s*\n/, ""); }
+function loadDD(text, name) {
+  S = blankState(); S.source = name; S.rows = expandDD(text); guessProject(); afterLoad();
+}
+function loadMapping(text, name, projectText) {
+  const head = (parseCSV(text)[0] || []).map(h => h.trim());
+  const missing = COLUMNS.filter(c => !head.includes(c));
+  if (missing.length) throw new Error(`${name} is missing column(s): ${missing.join(", ")}`);
+  S = blankState(); S.source = name;
+  S.rows = normalizeRows(recordsFromCSV(text));
+  if (projectText) loadProject(projectText); else guessProject();
+  afterLoad();
+}
+function loadProject(text) {
+  const p = JSON.parse(text);
+  S.project = Object.assign(blankProject(), p);
+  S.project.person = Object.assign(blankProject().person, p.person || {});
+  S.project.death = Object.assign(blankProject().death, p.death || {});
+  S.project.forms = p.forms || {};
+  for (const f of forms()) S.project.forms[f] = Object.assign({ date_field: "", visit_concept_id: 0 }, S.project.forms[f] || {});
+}
+function guessProject() {
+  const p = blankProject();
+  p.record_id_field = S.rows.length ? S.rows[0].field : "";
+  const dates = fieldsWhere(isDateField);
+  const birth = dates.find(r => /birth|dob/i.test(r.field + " " + r.field_label));
+  if (birth) p.person.birth_date_field = birth.field;
+  const sex = fieldsWhere(r => ["radio", "dropdown"].includes(r.field_type) && /\b(sex|gender)\b/i.test(r.field + " " + r.field_label))[0];
+  if (sex) { p.person.sex_field = sex.field; p.person.sex_concepts = guessSex(sex.field); }
+  const dflag = fieldsWhere(r => ["yesno", "radio"].includes(r.field_type) && /deceas|died|death|dead/i.test(r.field + " " + r.field_label))[0];
+  if (dflag) {
+    p.death.flag_field = dflag.field;
+    const yes = choicesOf(dflag.field).find(c => /^(yes|1|deceased|died)$/i.test(c.choice_label)) || choicesOf(dflag.field)[0];
+    p.death.flag_code = yes ? yes.choice_code : "1";
+    const dd = dates.find(r => /death|died|deceas/i.test(r.field + " " + r.field_label));
+    p.death.date_field = dd ? dd.field : "";
+  }
+  for (const f of forms()) {
+    const own = dates.filter(r => r.form === f && r.field !== p.person.birth_date_field && r.field !== p.death.date_field);
+    const pick = own.find(r => /visit|date|dt/i.test(r.field)) || own[0];
+    p.forms[f] = { date_field: pick ? pick.field : "", visit_concept_id: 0 };
+  }
+  S.project = p;
+  markProjectFields();
+}
+function guessSex(field) {
+  const out = {};
+  for (const c of choicesOf(field)) {
+    const l = c.choice_label.trim().toLowerCase();
+    out[c.choice_code] = /^(m|male|man|boy)$/.test(l) ? 8507 : /^(f|female|woman|girl)$/.test(l) ? 8532 : 0;
+  }
+  return out;
+}
+// Fields the project settings use are not mapped themselves.
+function markProjectFields() {
+  const p = S.project, used = {};
+  if (p.record_id_field) used[p.record_id_field] = "record id";
+  for (const k of ["birth_date_field", "birth_year_field", "sex_field", "race_field", "ethnicity_field"])
+    if (p.person[k]) used[p.person[k]] = "person: " + k.replace(/_field$/, "").replace(/_/g, " ");
+  for (const [f, cfg] of Object.entries(p.forms)) if (cfg.date_field && !used[cfg.date_field]) used[cfg.date_field] = `form date (${f})`;
+  if (p.death.flag_field) used[p.death.flag_field] = "death: flag";
+  if (p.death.date_field) used[p.death.date_field] = "death: date";
+  for (const r of S.rows) if (used[r.field] && r.omop_table === "") { r.omop_table = "SKIP"; if (!r.notes) r.notes = used[r.field]; }
+}
+function afterLoad() {
+  S.ui.form = ""; S.ui.page = 0; save(); renderAll();
+  const nf = new Set(S.rows.map(r => r.field)).size;
+  const box = document.getElementById("loadSummary"); box.hidden = false;
+  const counts = {}; for (const r of S.rows) counts[status(r)] = (counts[status(r)] || 0) + 1;
+  box.innerHTML = `<h2>Loaded ${esc(S.source)}</h2><p>${S.rows.length.toLocaleString()} rows from ${nf.toLocaleString()} fields in
+    ${forms().length} form(s): ${Object.entries(counts).map(([k, v]) => `${v} ${STATUS_TEXT[k]}`).join(", ")}.</p>
+    <p class="small muted">Checkbox fields have one row per answer, read from REDCap's <code>field___code</code> columns.
+    Descriptive and file-upload fields hold no answers and are left out.</p>
+    <button class="btn" onclick="go(1)">Next: project settings</button>`;
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function go(step) {
+  S.ui.step = step; save();
+  document.querySelectorAll("section.step").forEach((s, i) => s.classList.toggle("on", i === step));
+  document.querySelectorAll("#steps button").forEach((b, i) => { if (i === step) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current"); });
+  if (step === 1) renderProject();
+  if (step === 2) renderMap();
+  if (step === 3) renderCheck();
+  if (step === 4) renderExport();
+  window.scrollTo(0, 0);
+}
+function renderAll() { go(S.ui.step || 0); }
+function options(list, current, blank) {
+  return (blank !== undefined ? `<option value="">${esc(blank)}</option>` : "") +
+    list.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(current) ? " selected" : ""}>${esc(t)}</option>`).join("");
+}
+function fieldOpts(pred) { return fieldsWhere(pred).map(r => [r.field, `${r.field}  (${r.form})`]); }
+
+function renderProject() {
+  const p = S.project, person = p.person;
+  const set = (id, html) => { document.getElementById(id).innerHTML = html; };
+  set("pRecord", options(fieldOpts(() => true), p.record_id_field));
+  set("pBirth", options(fieldOpts(isDateField), person.birth_date_field, "(none)"));
+  set("pBirthYear", options(fieldOpts(r => r.field_type === "text" && !isDateField(r)), person.birth_year_field || "", "(none)"));
+  const choiceFields = r => ["radio", "dropdown"].includes(r.field_type);
+  set("pSex", options(fieldOpts(choiceFields), person.sex_field, "(none)"));
+  set("pRace", options(fieldOpts(choiceFields), person.race_field || "", "(none)"));
+  set("pEth", options(fieldOpts(choiceFields), person.ethnicity_field || "", "(none)"));
+  codeTable("sexCodes", person.sex_field, "sex_concepts", [["8507", "8507 MALE"], ["8532", "8532 FEMALE"], ["0", "0 no concept"]]);
+  codeTable("raceCodes", person.race_field, "race_concepts", null);
+  codeTable("ethCodes", person.ethnicity_field, "ethnicity_concepts", null);
+  const dateOpts = fieldOpts(isDateField);
+  document.getElementById("formRows").innerHTML = forms().map(f => {
+    const cfg = p.forms[f] || { date_field: "", visit_concept_id: 0 };
+    const known = VISITS.some(([v]) => v === String(cfg.visit_concept_id || 0));
+    return `<tr><td class="mono">${esc(f)}</td>
+      <td><select data-form="${esc(f)}" data-k="date_field">${options(dateOpts, cfg.date_field, "(none)")}</select></td>
+      <td><select data-form="${esc(f)}" data-k="visit_concept_id">${options(known ? VISITS : VISITS.concat([[String(cfg.visit_concept_id), String(cfg.visit_concept_id)]]), String(cfg.visit_concept_id || 0))}</select></td></tr>`;
+  }).join("");
+  set("dFlag", options(fieldOpts(r => ["yesno", "radio", "dropdown", "truefalse"].includes(r.field_type)), p.death.flag_field, "(none)"));
+  set("dCode", options(choicesOf(p.death.flag_field).map(c => [c.choice_code, `${c.choice_code} = ${c.choice_label}`]), p.death.flag_code));
+  set("dDate", options(dateOpts, p.death.date_field, "(none)"));
+  document.getElementById("pName").value = p.registry_name || "";
+  document.getElementById("pType").value = p.type_concept_id;
+  document.getElementById("pMinYear").value = p.min_year || 1900;
+}
+function codeTable(boxId, field, key, presets) {
+  const box = document.getElementById(boxId);
+  if (!field) { box.innerHTML = ""; return; }
+  const map = S.project.person[key] || {};
+  box.innerHTML = `<table style="margin-top:8px;max-width:640px"><thead><tr><th>Code</th><th>Answer</th><th>Concept id</th></tr></thead><tbody>` +
+    choicesOf(field).map(c => {
+      const cur = map[c.choice_code] == null ? 0 : map[c.choice_code];
+      const input = presets ? `<select data-ckey="${key}" data-code="${esc(c.choice_code)}">${options(presets.concat(presets.some(([v]) => v === String(cur)) ? [] : [[String(cur), String(cur)]]), String(cur))}</select>`
+        : `<input type="text" class="id" data-ckey="${key}" data-code="${esc(c.choice_code)}" value="${esc(cur || "")}">`;
+      return `<tr><td class="mono">${esc(c.choice_code)}</td><td>${esc(c.choice_label)}</td><td>${input}</td></tr>`;
+    }).join("") + `</tbody></table>`;
+}
+
+function viewRows() {
+  const q = S.ui.search.trim().toLowerCase(), probs = new Set(S.issues.filter(i => i.severity !== "unchecked").map(i => i.form + "\u0001" + rowKey(i)));
+  return S.rows.filter(r => (!S.ui.form || r.form === S.ui.form)
+    && (S.ui.status === "all" || (S.ui.status === "problem" ? probs.has(r.form + "\u0001" + rowKey(r)) : status(r) === S.ui.status))
+    && (!q || [r.field, r.field_label, r.choice_label, r.concept_id, r.concept_name, r.choice_code].some(v => String(v).toLowerCase().includes(q))));
+}
+function athenaSearch(r) {
+  const dom = TABLE_DOMAIN[r.omop_table];
+  const q = encodeURIComponent(rowLabel(r));
+  return `https://athena.ohdsi.org/search-terms/terms?${dom ? "domain=" + encodeURIComponent(dom) + "&" : ""}standardConcept=Standard&page=1&pageSize=15&query=${q}`;
+}
+function renderMap() {
+  const f = document.getElementById("fForm");
+  f.innerHTML = options(forms().map(x => [x, x]), S.ui.form, "all forms");
+  document.getElementById("fStatus").value = S.ui.status;
+  document.getElementById("fSearch").value = S.ui.search;
+  const rows = viewRows(), pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  if (S.ui.page >= pages) S.ui.page = pages - 1;
+  const counts = {}; for (const r of S.rows) counts[status(r)] = (counts[status(r)] || 0) + 1;
+  document.getElementById("counts").textContent = `${rows.length} of ${S.rows.length} rows shown. ` +
+    ["mapped", "needs", "undecided", "skip"].map(k => `${counts[k] || 0} ${STATUS_TEXT[k]}`).join(", ");
+  const pager = `<button class="btn secondary" data-page="-1" ${S.ui.page === 0 ? "disabled" : ""}>Previous</button>
+    <span class="small">Page ${S.ui.page + 1} of ${pages}</span>
+    <button class="btn secondary" data-page="1" ${S.ui.page >= pages - 1 ? "disabled" : ""}>Next</button>`;
+  document.getElementById("pagerTop").innerHTML = pager;
+  document.getElementById("pagerBottom").innerHTML = pager;
+  const dateOpts = fieldOpts(isDateField);
+  document.getElementById("mapRows").innerHTML = rows.slice(S.ui.page * PAGE, (S.ui.page + 1) * PAGE).map(r => {
+    const i = S.rows.indexOf(r), st = status(r), iss = issuesFor(r), id = toInt(r.concept_id);
+    const tableOpts = options([["", "(decide)"], ...TABLES.map(t => [t, t]), ["SKIP", "SKIP"]], r.omop_table);
+    const v = S.vocab && S.vocab.concepts[id];
+    const checked = S.vocab && S.vocab.looked[id];
+    const nm = id <= 0 ? "" : checked ? (v ? `<div class="vname ${iss.some(x => x.severity === "error" && x.role === "concept") ? "bad" : "ok"}">${esc(v.concept_name)} <span class="muted">(${esc(v.domain_id)}, ${esc(v.vocabulary_id)})</span></div>` : `<div class="vname bad">not in the vocabulary</div>`)
+      : `<div class="vname none">${r.concept_name ? esc(r.concept_name) + ", " : ""}not checked</div>`;
+    const valueBits = ["OBSERVATION", "MEASUREMENT"].includes(r.omop_table)
+      ? `<div class="small muted">value</div><input class="id" data-i="${i}" data-k="value_concept_id" value="${esc(r.value_concept_id)}" title="value_as_concept_id, for an answer concept">
+         <div class="small muted">unit</div><input class="id" data-i="${i}" data-k="unit_concept_id" value="${esc(r.unit_concept_id)}" title="unit_concept_id">` : `<span class="small muted">n/a</span>`;
+    const ownDate = isDateField(r) && !r.choice_code;
+    const dateCell = ownDate ? `<span class="small">its own value</span>` :
+      `<select data-i="${i}" data-k="date_field">${options(dateOpts, r.date_field, formDate(r.form) ? "form date: " + formDate(r.form) : "(form has no date field)")}</select>
+       <div class="small muted">offset days <input class="off" type="number" data-i="${i}" data-k="date_offset_days" value="${esc(r.date_offset_days)}"></div>`;
+    const failed = iss.some(x => x.severity === "error");
+    const chips = (failed ? `<span class="chip error">mapped, check failed</span>` : `<span class="chip ${st}">${STATUS_TEXT[st]}</span>`) + iss.filter(x => x.severity !== "unchecked").map(x => `<div style="margin-top:4px"><span class="chip ${x.severity}" title="${esc(x.message)}">${x.severity}</span> <span class="small">${esc(x.role !== "concept" ? x.role + ": " : "")}${esc(x.message)}</span></div>`).join("")
+      + (iss.some(x => x.severity === "unchecked") ? `<div class="small muted" style="margin-top:4px">changed since the check</div>` : "");
+    const look = `<a href="${athenaSearch(r)}" target="_blank" rel="noopener">Search Athena</a>` + (id > 0 ? `<br><a href="https://athena.ohdsi.org/search-terms/terms/${id}" target="_blank" rel="noopener">Concept ${id}</a>` : "");
+    return `<tr>
+      <td class="field"><div class="mono">${esc(r.field)}${r.choice_code !== "" ? " = " + esc(r.choice_code) : ""}</div>
+        <div class="lab">${r.choice_code !== "" ? "<b>" + esc(r.choice_label) + "</b> &middot; " : ""}${esc(r.field_label)}</div>
+        <div class="small muted">${esc(r.form)} &middot; ${esc(r.field_type)}${r.validation ? " &middot; " + esc(r.validation) : ""}</div></td>
+      <td><select data-i="${i}" data-k="omop_table">${tableOpts}</select></td>
+      <td><input class="id" data-i="${i}" data-k="concept_id" value="${esc(r.concept_id)}" ${TABLES.includes(r.omop_table) ? "" : "disabled"}>${nm}</td>
+      <td>${valueBits}</td><td>${dateCell}</td><td class="small">${look}</td><td>${chips}</td>
+      <td><input type="text" data-i="${i}" data-k="notes" value="${esc(r.notes)}" size="18"></td></tr>`;
+  }).join("") || `<tr><td colspan="8" class="muted">No rows match. ${S.rows.length ? "" : "Load a data dictionary in step 1."}</td></tr>`;
+}
+
+function renderCheck() {
+  const box = document.getElementById("checkResults");
+  if (!S.vocab) { box.hidden = true; return; }
+  box.hidden = false;
+  const n = s => S.issues.filter(i => i.severity === s).length;
+  const used = conceptUses(), distinct = new Set(used.map(u => u.concept_id)).size;
+  const order = { error: 0, warning: 1, review: 2, unchecked: 3 };
+  const list = [...S.issues].sort((a, b) => order[a.severity] - order[b.severity]);
+  box.innerHTML = `<h2>Result</h2>
+    <p class="small muted">${esc(S.vocab.release)}, checked ${esc(S.vocab.checked_at)}: ${distinct} distinct ids used ${used.length} times.</p>
+    <div><span class="stat"><b>${n("error")}</b>errors</span><span class="stat"><b>${n("warning")}</b>warnings</span>
+      <span class="stat"><b>${n("review")}</b>to review</span>${n("unchecked") ? `<span class="stat"><b>${n("unchecked")}</b>changed since the check</span>` : ""}</div>
+    ${!list.length ? `<div class="note ok">Every concept id exists, is valid and standard, and sits in the right table.</div>` : `
+    <table style="margin-top:10px"><thead><tr><th>Severity</th><th>Where</th><th>Concept</th><th>Vocabulary says</th><th>Problem</th><th>Replacement</th></tr></thead><tbody>
+    ${list.map(x => {
+      const sugg = (S.vocab.replacements[x.concept_id] || []).map(t => { const v = S.vocab.concepts[t] || {};
+        return x.role === "project" ? `${t} ${esc(v.concept_name || "")}` : `<button class="btn secondary" data-use="${t}" data-field="${esc(x.field)}" data-code="${esc(x.choice_code)}" data-form="${esc(x.form)}" data-role="${x.role}" title="Put ${t} in this row">Use ${t} ${esc(v.concept_name || "")}</button>`; }).join(" ");
+      return `<tr><td><span class="chip ${x.severity}">${x.severity}</span></td>
+        <td><span class="mono">${esc(x.field)}${x.choice_code !== "" ? " = " + esc(x.choice_code) : ""}</span><div class="small muted">${esc(x.label)} ${x.role !== "concept" ? "(" + x.role + ")" : ""}</div></td>
+        <td class="mono">${x.concept_id > 0 ? `<a href="https://athena.ohdsi.org/search-terms/terms/${x.concept_id}" target="_blank" rel="noopener">${x.concept_id}</a>` : x.concept_id}</td>
+        <td class="small">${esc(x.vocab_name)}${x.vocab_domain ? ` <span class="muted">(${esc(x.vocab_domain)}, ${esc(x.vocab_vocabulary)})</span>` : ""}</td>
+        <td class="small">${esc(x.message)}</td><td class="small">${sugg}</td></tr>`;
+    }).join("")}</tbody></table>`}
+    <div class="row"><button class="btn secondary" onclick="S.ui.status='problem';S.ui.form='';S.ui.page=0;go(2)">Show these rows in step 3</button></div>`;
+}
+
+function readiness() {
+  const msgs = [], p = S.project;
+  if (!S.rows.length) msgs.push(["bad", "No mapping loaded yet (step 1)."]);
+  if (!p.record_id_field) msgs.push(["bad", "Choose the record id field (step 2)."]);
+  if (!p.person.birth_date_field && !p.person.birth_year_field) msgs.push(["bad", "Choose a date of birth or year of birth field (step 2): OMOP requires a year of birth."]);
+  const undated = [...new Set(S.rows.filter(r => status(r) === "mapped" && !rowDateField(r)).map(r => r.field))];
+  if (undated.length) msgs.push(["bad", `${undated.length} mapped field(s) have no date: ${undated.slice(0, 5).join(", ")}. Give their form a date field (step 2) or the row a date field (step 3).`]);
+  const c = {}; for (const r of S.rows) c[status(r)] = (c[status(r)] || 0) + 1;
+  if (c.undecided) msgs.push(["warn", `${c.undecided} row(s) still to decide. They produce nothing, which is safe, but check none of them should be mapped.`]);
+  if (c.needs) msgs.push(["warn", `${c.needs} row(s) have a table but no concept id, so they produce nothing yet.`]);
+  if (!S.vocab) msgs.push(["warn", "The concept ids have not been checked against a vocabulary (step 4)."]);
+  else {
+    const e = S.issues.filter(i => i.severity === "error").length, u = S.issues.filter(i => i.severity === "unchecked").length;
+    if (e) msgs.push(["bad", `The concept check found ${e} error(s) (step 4).`]);
+    if (u) msgs.push(["warn", `${u} concept id(s) changed since the check; run it again (step 4).`]);
+  }
+  return { msgs, c };
+}
+function renderExport() {
+  const { msgs, c } = readiness();
+  document.getElementById("readiness").innerHTML = `<h2>Before you export</h2>
+    <div><span class="stat"><b>${c.mapped || 0}</b>mapped</span><span class="stat"><b>${c.needs || 0}</b>concept missing</span>
+    <span class="stat"><b>${c.undecided || 0}</b>to decide</span><span class="stat"><b>${c.skip || 0}</b>skipped</span></div>` +
+    (msgs.length ? msgs.map(([k, m]) => `<div class="note ${k}">${esc(m)}</div>`).join("") : `<div class="note ok">Ready: the runner has everything it needs.</div>`);
+  document.getElementById("dlReport").disabled = !S.vocab;
+  const repo = repoUrl();
+  document.getElementById("kitLinks").innerHTML = repo
+    ? `The runner is <a href="${repo}/blob/main/runner/redcap_to_omop.py" target="_blank" rel="noopener">runner/redcap_to_omop.py</a>;
+       <a href="${repo}/archive/refs/heads/main.zip">download the whole kit as a zip</a>, or see the
+       <a href="${repo}/blob/main/GUIDE.md" target="_blank" rel="noopener">guide</a>.`
+    : `The runner is <code>runner/redcap_to_omop.py</code> in the kit this page came with; the kit's <code>GUIDE.md</code> walks through it.`;
+}
+// On GitHub Pages the repository follows from the address: owner.github.io/repo/.
+function repoUrl() {
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/i);
+  if (!m) return "";
+  const repo = location.pathname.split("/").filter(Boolean)[0];
+  return repo ? `https://github.com/${m[1]}/${repo}` : "";
+}
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+function mappingCSV() { return toCSV(COLUMNS, S.rows); }
+function projectJSON() {
+  const p = JSON.parse(JSON.stringify(S.project));
+  p.format = FORMAT;
+  p.type_concept_id = toInt(p.type_concept_id) || 32879;
+  p.min_year = toInt(p.min_year) || 1900;
+  for (const f of Object.keys(p.forms)) p.forms[f].visit_concept_id = toInt(p.forms[f].visit_concept_id);
+  for (const k of ["sex_concepts", "race_concepts", "ethnicity_concepts"]) if (p.person[k]) for (const c of Object.keys(p.person[k])) p.person[k][c] = toInt(p.person[k][c]);
+  for (const k of ["birth_year_field", "race_field", "ethnicity_field"]) if (!p.person[k]) delete p.person[k];
+  for (const k of ["race_concepts", "ethnicity_concepts"]) if (!p.person[k.replace("_concepts", "_field")]) delete p.person[k];
+  return JSON.stringify(p, null, 2) + "\n";
+}
+function reportCSV() {
+  const fields = ["severity", "form", "field", "choice_code", "label", "table", "role", "concept_id", "vocab_name", "vocab_domain", "vocab_vocabulary", "message", "suggestion"];
+  const order = { error: 0, warning: 1, review: 2, unchecked: 3 };
+  return toCSV(fields, [...S.issues].sort((a, b) => order[a.severity] - order[b.severity] || a.form.localeCompare(b.form) || a.field.localeCompare(b.field)));
+}
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---------------------------------------------------------------------------
+// Edits
+// ---------------------------------------------------------------------------
+function rowEdit(el) {
+  const r = S.rows[+el.dataset.i], k = el.dataset.k;
+  r[k] = el.value.trim();
+  if (k === "omop_table" && !TABLES.includes(r.omop_table)) { /* keep the id; it simply produces nothing */ }
+  if (["concept_id", "value_concept_id", "unit_concept_id"].includes(k)) {
+    const nc = k.replace("_id", "_name");
+    const v = S.vocab && S.vocab.concepts[toInt(r[k])];
+    r[nc] = v ? v.concept_name : "";
+  }
+  runRules(); save();
+  if (k === "omop_table" || k.endsWith("concept_id")) renderMap();
+}
+// Answer wording that says how much or when, not what. A list made of these
+// (Yes / No / Don't know, Current / Past) means something different on every
+// question, so copying its concepts from one question to another would be wrong.
+const VAGUE_ANSWER = /^(yes|no|y|n|true|false|unknown|unsure|not sure|don'?t know|dk|n\/?a|not applicable|none|other|current|past|never|ever|present|absent|mild|moderate|severe|checked)\b/i;
+function copyLists() {
+  const sig = f => choicesOf(f).map(c => c.choice_code + "=" + c.choice_label.toLowerCase()).join("|");
+  const groups = {};
+  for (const r of fieldsWhere(r => r.choice_code !== "" && !["yesno", "truefalse"].includes(r.field_type))) (groups[sig(r.field)] = groups[sig(r.field)] || []).push(r.field);
+  const plans = [];
+  for (const fieldsInGroup of Object.values(groups)) {
+    if (fieldsInGroup.length < 2) continue;
+    const labels = choicesOf(fieldsInGroup[0]).map(c => c.choice_label);
+    if (labels.filter(l => !VAGUE_ANSWER.test(l.trim())).length < 2) continue;
+    const src = fieldsInGroup.find(f => choicesOf(f).some(c => status(c) !== "undecided"));
+    if (!src) continue;
+    const targets = fieldsInGroup.filter(f => f !== src && choicesOf(f).some(c => c.omop_table === ""));
+    if (targets.length) plans.push([src, targets]);
+  }
+  if (!plans.length) { alert("Nothing to copy: no undecided field shares a specific answer list (drug names, diagnoses) with a field that has mappings."); return; }
+  const text = plans.map(([s, t]) => `${s} -> ${t.join(", ")}`).join("\n");
+  if (!confirm(`Copy mappings answer by answer, only into rows still undecided:\n\n${text}\n\nOnly do this where the answers name the thing itself.`)) return;
+  let n = 0;
+  for (const [src, targets] of plans) {
+    for (const f of targets) {
+      for (const c of choicesOf(f)) {
+        if (c.omop_table !== "") continue;
+        const from = choicesOf(src).find(x => x.choice_code === c.choice_code);
+        if (!from || from.omop_table === "") continue;
+        for (const k of ["omop_table", "concept_id", "concept_name", "value_concept_id", "value_concept_name", "unit_concept_id", "unit_concept_name", "date_offset_days"]) c[k] = from[k];
+        if (!c.notes) c.notes = `copied from ${src}`;
+        n++;
+      }
+    }
+  }
+  runRules(); save(); renderMap();
+  alert(n ? `Copied ${n} row(s) from fields with the same answer list.` : "Nothing to copy: no undecided field shares its answer list with a field that has mappings.");
+}
+function skipView() {
+  const rows = viewRows().filter(r => status(r) === "undecided");
+  if (!rows.length) { alert("No undecided rows in this view."); return; }
+  if (!confirm(`Set ${rows.length} undecided row(s) in this view to SKIP?`)) return;
+  for (const r of rows) r.omop_table = "SKIP";
+  save(); renderMap();
+}
+function useReplacement(btn) {
+  const r = S.rows.find(x => x.form === btn.dataset.form && x.field === btn.dataset.field && x.choice_code === btn.dataset.code);
+  if (!r) return;
+  const col = { concept: "concept_id", value: "value_concept_id", unit: "unit_concept_id" }[btn.dataset.role];
+  r[col] = btn.dataset.use;
+  const v = S.vocab.concepts[toInt(btn.dataset.use)]; if (v) r[col.replace("_id", "_name")] = v.concept_name;
+  S.vocab.looked[toInt(btn.dataset.use)] = !!v;
+  runRules(); save(); renderCheck();
+}
+
+// ---------------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------------
+function onFile(id, fn) {
+  document.getElementById(id).addEventListener("change", async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { await fn(f); } catch (err) { alert(err.message); }
+    e.target.value = "";
+  });
+}
+function wire() {
+  document.querySelectorAll("#steps button").forEach(b => b.addEventListener("click", () => go(+b.dataset.step)));
+  onFile("ddFile", async f => loadDD(await readText(f), f.name));
+  let pendingMap = null;
+  onFile("mapFile", async f => { pendingMap = [await readText(f), f.name]; loadMapping(pendingMap[0], f.name, null); });
+  onFile("projFile", async f => {
+    const t = await readText(f);
+    if (!S.rows.length) { alert("Load mapping.csv first, then project.json."); return; }
+    loadProject(t); save(); afterLoad();
+  });
+  document.getElementById("demoBlank").onclick = () => loadDD(demo("demo-dd"), "demo data_dictionary.csv");
+  document.getElementById("demoDone").onclick = () => loadMapping(demo("demo-mapping"), "demo mapping.csv", demo("demo-project"));
+  document.getElementById("demoBad").onclick = () => loadMapping(demo("demo-mapping-mistakes"), "demo mapping_with_mistakes.csv", demo("demo-project"));
+  document.getElementById("startOver").onclick = () => {
+    if (!confirm("Clear the saved mapping from this browser? Export it first if you need it.")) return;
+    localStorage.removeItem(STORE); S = blankState(); document.getElementById("loadSummary").hidden = true; renderAll();
+  };
+  // project settings
+  const pset = (id, fn) => document.getElementById(id).addEventListener("change", e => { fn(e.target.value); markProjectFields(); runRules(); save(); renderProject(); });
+  pset("pRecord", v => S.project.record_id_field = v);
+  pset("pBirth", v => S.project.person.birth_date_field = v);
+  pset("pBirthYear", v => S.project.person.birth_year_field = v);
+  pset("pSex", v => { S.project.person.sex_field = v; S.project.person.sex_concepts = v ? guessSex(v) : {}; });
+  pset("pRace", v => { S.project.person.race_field = v; S.project.person.race_concepts = {}; });
+  pset("pEth", v => { S.project.person.ethnicity_field = v; S.project.person.ethnicity_concepts = {}; });
+  pset("dFlag", v => { S.project.death.flag_field = v; const c = choicesOf(v)[0]; S.project.death.flag_code = (choicesOf(v).find(x => /^(yes|1)$/i.test(x.choice_label)) || c || { choice_code: "1" }).choice_code; });
+  pset("dCode", v => S.project.death.flag_code = v);
+  pset("dDate", v => S.project.death.date_field = v);
+  pset("pName", v => S.project.registry_name = v);
+  pset("pType", v => S.project.type_concept_id = toInt(v));
+  pset("pMinYear", v => S.project.min_year = toInt(v));
+  document.getElementById("step1").addEventListener("change", e => {
+    const el = e.target;
+    if (el.dataset.form) { S.project.forms[el.dataset.form][el.dataset.k] = el.dataset.k === "visit_concept_id" ? toInt(el.value) : el.value; markProjectFields(); runRules(); save(); }
+    if (el.dataset.ckey) { (S.project.person[el.dataset.ckey] = S.project.person[el.dataset.ckey] || {})[el.dataset.code] = toInt(el.value); runRules(); save(); }
+  });
+  // map table
+  document.getElementById("mapRows").addEventListener("change", e => { if (e.target.dataset.i !== undefined) rowEdit(e.target); });
+  document.getElementById("fForm").onchange = e => { S.ui.form = e.target.value; S.ui.page = 0; save(); renderMap(); };
+  document.getElementById("fStatus").onchange = e => { S.ui.status = e.target.value; S.ui.page = 0; save(); renderMap(); };
+  let st = null;
+  document.getElementById("fSearch").oninput = e => { clearTimeout(st); st = setTimeout(() => { S.ui.search = e.target.value; S.ui.page = 0; save(); renderMap(); document.getElementById("fSearch").focus(); }, 250); };
+  for (const id of ["pagerTop", "pagerBottom"]) document.getElementById(id).addEventListener("click", e => {
+    const b = e.target.closest("button[data-page]"); if (!b) return; S.ui.page += +b.dataset.page; save(); renderMap(); });
+  document.getElementById("copyLists").onclick = copyLists;
+  document.getElementById("skipView").onclick = skipView;
+  // check
+  let relFileObj = null;
+  onFile("relFile", async f => { relFileObj = f; document.getElementById("progText").textContent = `${f.name} will be used for replacements. Now choose CONCEPT.csv.`; });
+  onFile("conceptFile", async f => {
+    if (!S.rows.length) { alert("Load a mapping first (step 1)."); return; }
+    await runCheck(fileSource(f), relFileObj ? fileSource(relFileObj) : null, f.name + " (" + (f.size / 1e6).toFixed(0) + " MB)");
+    renderCheck();
+  });
+  document.getElementById("checkResults").addEventListener("click", e => { const b = e.target.closest("button[data-use]"); if (b) useReplacement(b); });
+  // export
+  document.getElementById("dlMapping").onclick = () => download("mapping.csv", mappingCSV(), "text/csv");
+  document.getElementById("dlProject").onclick = () => download("project.json", projectJSON(), "application/json");
+  document.getElementById("dlReport").onclick = () => download("check_report.csv", reportCSV(), "text/csv");
+}
+
+// ---------------------------------------------------------------------------
+// Self-test (?selftest=1). Used by tests/run_wizard_tests.py; harmless otherwise.
+// ---------------------------------------------------------------------------
+async function selftest(params) {
+  const out = { ok: true, checks: [], errors: ERRORS };
+  const panel = document.getElementById("selftest"); panel.style.display = "block";
+  const note = (name, pass, detail) => { out.checks.push({ name, pass, detail }); if (!pass) out.ok = false;
+    panel.innerHTML = `<b>Self-test ${out.ok ? "running" : "FAILING"}</b><br>` + out.checks.map(c => `${c.pass ? "PASS" : "FAIL"} ${esc(c.name)}${c.detail ? ": " + esc(c.detail) : ""}`).join("<br>"); };
+  try {
+    localStorage.removeItem(STORE);
+    const sameRows = (a, b) => JSON.stringify(a.map(r => COLUMNS.map(c => r[c] || ""))) === JSON.stringify(b.map(r => COLUMNS.map(c => r[c] || "")));
+    loadDD(demo("demo-dd"), "demo");
+    const expected = normalizeRows(recordsFromCSV(demo("demo-mapping-blank")));
+    const raw = expandDD(demo("demo-dd"));
+    note("data dictionary expands like start_mapping.py", sameRows(raw, expected), `${raw.length} rows vs ${expected.length}`);
+    out.expanded_csv = toCSV(COLUMNS, raw);
+    note("project settings guessed", S.project.record_id_field === "record_id" && S.project.person.birth_date_field === "dob"
+      && S.project.person.sex_field === "sex" && S.project.forms.baseline.date_field === "base_date" && S.project.death.flag_field === "deceased",
+      JSON.stringify({ rid: S.project.record_id_field, dob: S.project.person.birth_date_field, sex: S.project.person.sex_field, base: S.project.forms.baseline.date_field, death: S.project.death }));
+    for (let s = 0; s <= 4; s++) go(s);
+    note("every step renders", ERRORS.length === 0, ERRORS.join(" | "));
+    loadMapping(demo("demo-mapping"), "demo mapping.csv", demo("demo-project"));
+    const back = normalizeRows(recordsFromCSV(mappingCSV()));
+    note("mapping.csv survives load and export unchanged", sameRows(back, normalizeRows(recordsFromCSV(demo("demo-mapping")))), `${back.length} rows`);
+    out.project_json = projectJSON();
+    const canon = o => JSON.stringify(o, (k, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
+    note("project.json round-trips", canon(JSON.parse(out.project_json)) === canon(JSON.parse(demo("demo-project"))), "");
+    S.ui.status = "all"; go(2);
+    note("map table shows rows", document.querySelectorAll("#mapRows tr").length > 10, `${document.querySelectorAll("#mapRows tr").length} rows on page 1`);
+    if (params.get("dd")) {
+      // A large data dictionary from the test server: time the expansion and the map table.
+      const t0 = Date.now();
+      const r = await fetch(params.get("dd"));
+      const text = await readText({ arrayBuffer: () => r.arrayBuffer() });
+      loadDD(text, "external");
+      S.ui.form = ""; S.ui.status = "all"; go(2); go(1); go(4);
+      out.external_csv = toCSV(COLUMNS, expandDD(text));
+      note("external data dictionary loads and renders", ERRORS.length === 0,
+        `${S.rows.length} rows, ${forms().length} forms, ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    }
+    if (params.get("vocab")) {
+      loadMapping(demo("demo-mapping-mistakes"), "mistakes", demo("demo-project"));
+      const t0 = Date.now();
+      await runCheck(urlSource(params.get("vocab")), params.get("rel") ? urlSource(params.get("rel")) : null, "selftest");
+      out.issues = S.issues; out.check_seconds = (Date.now() - t0) / 1000;
+      note("concept check ran", S.issues.length > 0, `${S.issues.length} issues in ${out.check_seconds.toFixed(0)} s`);
+      go(3); go(2); go(4);
+      note("check results render", ERRORS.length === 0, ERRORS.join(" | "));
+    }
+  } catch (e) { note("no exception", false, String(e && e.stack || e)); }
+  note("no page errors", ERRORS.length === 0, ERRORS.join(" | "));
+  try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { /* storage blocked */ }
+  panel.insertAdjacentHTML("afterbegin", `<div style="font-size:18px;font-weight:700;color:${out.ok ? "#1f7a4d" : "#a8262b"}">${out.ok ? "SELF-TEST PASSED" : "SELF-TEST FAILED"}</div>`);
+  try { await fetch("/__selftest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(out) }); } catch (e) { /* no test server */ }
+  return out;
+}
+
+wire();
+const params = new URLSearchParams(location.search);
+if (params.get("selftest")) selftest(params);
+else {
+  restore();
+  // Deep links: ?demo=mapped|mistakes|blank loads a demo; ?step=1..5, ?status=, ?form= pick the view.
+  const d = params.get("demo");
+  if (d === "blank") loadDD(demo("demo-dd"), "demo data_dictionary.csv");
+  if (d === "mapped") loadMapping(demo("demo-mapping"), "demo mapping.csv", demo("demo-project"));
+  if (d === "mistakes") loadMapping(demo("demo-mapping-mistakes"), "demo mapping_with_mistakes.csv", demo("demo-project"));
+  if (params.get("status")) S.ui.status = params.get("status");
+  if (params.get("form") !== null) S.ui.form = params.get("form") || "";
+  const step = parseInt(params.get("step") || "", 10);
+  go(step >= 1 && step <= 5 ? step - 1 : (S.rows.length ? S.ui.step || 0 : 0));
+}
+</script>
+</body>
+</html>

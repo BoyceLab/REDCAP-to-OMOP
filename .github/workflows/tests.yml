@@ -1,0 +1,26 @@
+name: Tests
+
+# Runs the end-to-end tests on the fictional demo registry on every push and
+# pull request. Python 3.9 installs pandas 2.x; Python 3.12 installs pandas 3.x.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -r requirements.txt
+      - run: python tests/run_tests.py

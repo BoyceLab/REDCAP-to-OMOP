@@ -1,0 +1,39 @@
+{
+  "format": "redcap-omop-mapping-kit/1",
+  "registry_name": "Demo neurology registry (fictional)",
+  "record_id_field": "record_id",
+  "type_concept_id": 32879,
+  "min_year": 1900,
+  "person": {
+    "birth_date_field": "dob",
+    "sex_field": "sex",
+    "sex_concepts": {
+      "1": 8507,
+      "2": 8532,
+      "3": 0
+    }
+  },
+  "forms": {
+    "enrollment": {
+      "date_field": "enroll_date",
+      "visit_concept_id": 0
+    },
+    "baseline": {
+      "date_field": "base_date",
+      "visit_concept_id": 9202
+    },
+    "follow_up": {
+      "date_field": "fu_date",
+      "visit_concept_id": 9202
+    },
+    "end_of_study": {
+      "date_field": "",
+      "visit_concept_id": 0
+    }
+  },
+  "death": {
+    "flag_field": "deceased",
+    "flag_code": "1",
+    "date_field": "death_date"
+  }
+}
